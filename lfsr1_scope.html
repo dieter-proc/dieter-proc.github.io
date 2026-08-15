@@ -54,9 +54,9 @@ const PADDING = 8;
 // Calculate pixel size.
 // Available area = 1040 - 16 = 1024
 // 1024 / 32 = 32 pixels per grid cell.
-// Height: 528 - 16 = 512, so the grid remains 32×32 cells.
-const CELL_WIDTH  = 64;//(CANVAS_WIDTH  - PADDING * 2) / GRID_SIZE; // 32
-const CELL_HEIGHT = 51;//(CANVAS_HEIGHT - PADDING * 2) / GRID_SIZE; // 16
+// Height: 528 - 16 = 512, so the grid remains 32×16 cells.
+const CELL_WIDTH  = 64;
+const CELL_HEIGHT = 51;
 
 const BACKGROUND_COLOR = "#0C1219";
 const GRID_COLOR = "#565C5F";
@@ -104,9 +104,11 @@ function clearFrame() {
  
 var x0 = 1.0;
 var pos = 0;
-const data1024 = new Uint8Array(1024);
+const data1024 = new Uint8Array(1024).fill(200);
+const avg1024 = new Uint32Array(1024);
 
-let lfsr = 0xFFFFFF; // non-zero 24-bit seed
+//let lfsr = 0xFFFFFF; // non-zero 24-bit seed
+let lfsr = Math.floor(Math.random() * 0x1000000);
 
 function lfsrStep() {
   const feedback =
@@ -131,17 +133,26 @@ function renderFrame() {
   if ((pos % 8) == 0) lfsrStep();
   data1024[pos] = lfsr & 1;
   var last_py = 384;
+  var last_apy = 84;
+  for (let n = 0; n <= pos; n++) {
+    let avg = 0;
+    let amax = 32;
+    for (let a = 0; a < amax; a++) {
+      avg += data1024[(n + a) % 1023] ? 128 : 384;
+    }
+    avg /= amax;
+    avg1024[n] = avg;
+  }
 
   for (let x = 0; x < 1024; x++) {
-	if (x > pos) break;
+    if (x >= pos) break;
     //const y = 255 + Math.sin(0.03 * (x0 + x)) * 128;
-	const y =  data1024[x] ? 128 : 384;
-
+    const y =  data1024[x] ? 128 : 384;
     const px = x + PADDING;
     const py = y + PADDING;
 
     ctx.beginPath();
-  
+    ctx.strokeStyle = "#00FF88";
     if (x === 0) {
       ctx.moveTo(px, py);
     } else {
@@ -152,8 +163,22 @@ function renderFrame() {
       ctx.moveTo(px-1, last_py);
       ctx.lineTo(px, py);
     }
-	last_py = py;
+    last_py = py;
+    ctx.stroke();
 
+    ctx.beginPath();
+    let ay =  (avg1024[x] >> 1) + 128;
+    const apx = x + PADDING;
+    const apy = ay + PADDING;
+    ctx.strokeStyle = "#FF8820";
+    ctx.lineWidth = 2;
+    if (x === 0) {
+      ctx.moveTo(apx, apy);
+    } else {
+      ctx.moveTo(apx-1, last_apy);
+      ctx.lineTo(apx, apy);
+    }
+    last_apy = apy;
     ctx.stroke();
   }
   x0 += 0.9;
