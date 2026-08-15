@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>32×32 Oscilloscope Canvas</title>
+
+  <style>
+    html, body {
+      margin: 10px;
+      padding: 0;
+      background: white;
+    }
+
+    canvas {
+      display: block;
+      width: 1040px;
+      height: 528px;
+    }
+
+    .divcnv {
+      border: 4px solid #B0B0B0;
+	  display: inline-block;
+	  margin: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Episode #1699 WebDemo</h2>
+
+LFSR Random Number Generator (White Noise) <a href="https://www.youtube.com/watch?v=WGhRAbQ1fRw">https://www.youtube.com/watch?v=WGhRAbQ1fRw</a>
+<br><br>
+24-bit LFSR with taps at registers 7, 16, 22, 24 (q6, q15, q21, q23)
+<br>&nbsp;<br>
+
+
+<div class="divcnv">
+	<canvas id="scope" width="1040" height="528"></canvas>
+<div>
+
+<script>
+const canvas = document.getElementById("scope");
+const ctx = canvas.getContext("2d");
+
+// Canvas
+const CANVAS_WIDTH  = 1040;
+const CANVAS_HEIGHT = 526;
+
+// Grid
+const PADDING = 8;
+
+// Calculate pixel size.
+// Available area = 1040 - 16 = 1024
+// 1024 / 32 = 32 pixels per grid cell.
+// Height: 528 - 16 = 512, so the grid remains 32×32 cells.
+const CELL_WIDTH  = 64;//(CANVAS_WIDTH  - PADDING * 2) / GRID_SIZE; // 32
+const CELL_HEIGHT = 51;//(CANVAS_HEIGHT - PADDING * 2) / GRID_SIZE; // 16
+
+const BACKGROUND_COLOR = "#0C1219";
+const GRID_COLOR = "#565C5F";
+
+/**
+ * Draw the static oscilloscope background.
+ *
+ * Call this before rendering every new frame.
+ */
+function clearFrame() {
+  // Background
+  ctx.fillStyle = BACKGROUND_COLOR;
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  // Grid
+  ctx.strokeStyle = GRID_COLOR;
+  ctx.lineWidth = 1;
+
+  ctx.beginPath();
+
+  // Vertical grid lines
+  for (let x = 0; x <= CELL_WIDTH; x++) {
+    const px = PADDING + x * CELL_WIDTH + 0.5;
+
+    ctx.moveTo(px, PADDING);
+    ctx.lineTo(px, CANVAS_HEIGHT - PADDING);
+  }
+
+  // Horizontal grid lines
+  for (let y = 0; y <= CELL_WIDTH; y++) {
+    const py = PADDING + y * CELL_HEIGHT + 0.5;
+
+    ctx.moveTo(PADDING, py);
+    ctx.lineTo(CANVAS_WIDTH - PADDING, py);
+  }
+
+  ctx.stroke();
+}
+
+/**
+ * Render one frame.
+ *
+ * Anything drawn here will appear on top of the grid.
+ */
+ 
+var x0 = 1.0;
+var pos = 0;
+const data1024 = new Uint8Array(1024);
+
+let lfsr = 0xFFFFFF; // non-zero 24-bit seed
+
+function lfsrStep() {
+  const feedback =
+      ((lfsr >> 6)  ^
+       (lfsr >> 15) ^
+       (lfsr >> 21) ^
+       (lfsr >> 23)) & 1;
+
+  lfsr = (lfsr << 1) | feedback;
+  lfsr &= 0xFFFFFF;
+
+  return feedback;
+}
+
+function renderFrame() {
+  clearFrame();
+
+  // Example oscilloscope content:
+  ctx.strokeStyle = "#00FF88";
+  ctx.lineWidth = 1;
+
+  if ((pos % 8) == 0) lfsrStep();
+  data1024[pos] = lfsr & 1;
+  var last_py = 384;
+
+  for (let x = 0; x < 1024; x++) {
+	if (x > pos) break;
+    //const y = 255 + Math.sin(0.03 * (x0 + x)) * 128;
+	const y =  data1024[x] ? 128 : 384;
+
+    const px = x + PADDING;
+    const py = y + PADDING;
+
+    ctx.beginPath();
+  
+    if (x === 0) {
+      ctx.moveTo(px, py);
+    } else {
+	  if (last_py !== py)
+	      ctx.lineWidth = 0.5;
+	  else
+	      ctx.lineWidth = 3;
+      ctx.moveTo(px-1, last_py);
+      ctx.lineTo(px, py);
+    }
+	last_py = py;
+
+    ctx.stroke();
+  }
+  x0 += 0.9;
+  pos = (pos + 1) % 1024;
+}
+
+// Initial frame
+clearFrame();
+
+// Example:
+setInterval(renderFrame, 10);
+
+</script>
+
+</body>
+</html>
