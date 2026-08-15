@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>32×32 Oscilloscope Canvas</title>
+
+  <style>
+    html, body {
+      margin: 10px;
+      padding: 0;
+      background: white;
+    }
+
+    canvas {
+      display: block;
+      width: 1040px;
+      height: 528px;
+    }
+
+    .divcnv {
+      border: 4px solid #B0B0B0;
+      display: inline-block;
+      margin: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Episode #2680 WebDemo</h2>
+
+PLL Phase Detector using 7474 <a href="https://www.youtube.com/watch?v=r38NwxkmWgA" target=_blank>https://www.youtube.com/watch?v=r38NwxkmWgA</a>
+<br><br>
+Use <b>+ -</b> buttons below to tune frequency.
+<br>&nbsp;<br>
+
+
+<div class="divcnv">
+	<canvas id="scope" width="1040" height="528"></canvas>
+</div>
+
+<div>
+  FREQ DIFF: 
+  <span id="inf">-</span>
+  &nbsp; &nbsp;
+  <input type=button onclick="inc();" value=" + " />
+  &nbsp; &lt; CHANGE FREQ &gt; &nbsp;
+  <input type=button onclick="dec();" value=" - " />
+</div>
+
+<script>
+const canvas = document.getElementById("scope");
+const ctx = canvas.getContext("2d");
+
+// Canvas
+const CANVAS_WIDTH  = 1040;
+const CANVAS_HEIGHT = 526;
+
+// Grid
+const PADDING = 8;
+
+// Calculate pixel size.
+// Available area = 1040 - 16 = 1024
+// 1024 / 32 = 32 pixels per grid cell.
+// Height: 528 - 16 = 512, so the grid remains 32×16 cells.
+const CELL_WIDTH  = 64;
+const CELL_HEIGHT = 51;
+
+const BACKGROUND_COLOR = "#0C1219";
+const GRID_COLOR = "#565C5F";
+
+/**
+ * Draw the static oscilloscope background.
+ *
+ * Call this before rendering every new frame.
+ */
+function clearFrame() {
+  // Background
+  ctx.fillStyle = BACKGROUND_COLOR;
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  // Grid
+  ctx.strokeStyle = GRID_COLOR;
+  ctx.lineWidth = 1;
+
+  ctx.beginPath();
+
+  // Vertical grid lines
+  for (let x = 0; x <= CELL_WIDTH; x++) {
+    const px = PADDING + x * CELL_WIDTH + 0.5;
+
+    ctx.moveTo(px, PADDING);
+    ctx.lineTo(px, CANVAS_HEIGHT - PADDING);
+  }
+
+  // Horizontal grid lines
+  for (let y = 0; y <= CELL_WIDTH; y++) {
+    const py = PADDING + y * CELL_HEIGHT + 0.5;
+
+    ctx.moveTo(PADDING, py);
+    ctx.lineTo(CANVAS_WIDTH - PADDING, py);
+  }
+
+  ctx.stroke();
+}
+
+/**
+ * Render one frame.
+ *
+ * Anything drawn here will appear on top of the grid.
+ */
+ 
+var pos = 0;
+var cpos = 0;
+var fsz = 129;
+const clk1 = new Uint8Array(1024);
+const clk2 = new Uint8Array(1024);
+const trg1 = new Uint8Array(1024);
+const trg2 = new Uint8Array(1024);
+
+for (let c = 0; c < 1024; c++) {
+  if ((c / 128 & 1) == 1) clk1[c] = 0; else clk1[c] = 1;
+}
+document.getElementById("inf").innerText = "" + (128 - fsz);
+
+function inc() {
+  if (fsz > 120) fsz--;
+  document.getElementById("inf").innerText = "" + (128 - fsz);
+}
+function dec() {
+  if (fsz < 136) fsz++;
+  document.getElementById("inf").innerText = "" + (128 - fsz);
+}
+
+function drawSignal(clk, color, y0) {
+  for (let x = 0; x < 1024; x++) {
+    //if (x >= pos) break;
+    //const y = 255 + Math.sin(0.03 * (x0 + x)) * 128;
+    const y =  y0 + (clk[x] ? 0 : 74);
+    const px = x + PADDING;
+    const py = y + PADDING;
+
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    var add = 0;
+    if (x === 0) {
+      ctx.moveTo(px, py);
+    } else {
+	  if (last_py !== py) {
+	    ctx.lineWidth = 0.5;
+      if (last_py < py) add = 8; else add = -8;
+    }
+	  else
+	    ctx.lineWidth = 4;
+      ctx.moveTo(px-1, last_py);
+      ctx.lineTo(px, py + add);
+    }
+    last_py = py;
+    ctx.stroke();
+  }
+}
+
+function renderFrame() {
+  clearFrame();
+
+  // Example oscilloscope content:
+  ctx.strokeStyle = "#00FF88";
+  ctx.lineWidth = 1;
+  
+  for (let c = 0; c < 1024 - 0; c++) {
+    if (((cpos / fsz) & 1) == 1) clk2[c] = 0; else clk2[c] = 1;
+    cpos = (cpos + 1) % (fsz * 2);
+  }
+  if (fsz > 128) cpos += 7;//(7 << (fsz - 129))  | 7;
+  if (fsz < 128) cpos -= 7;//(7 << (127 - fsz))  | 7;
+  //document.getElementById("inf").innerText = "" + (cpos);
+
+  for (let t = 0; t < 1024 - 0; t++) {
+    //if (trg1[(t - 1) & 1023] && trg2[(t - 1) & 1023]) { trg1[t] = 0; trg2[t] = 0; }
+    trg1[t] = trg1[(t - 1) & 1023]; trg2[t] = trg2[(t - 1) & 1023];
+    if (clk1[t] && !clk1[(t - 1) & 1023]) trg1[t] = 1;
+    if (clk2[t] && !clk2[(t - 1) & 1023]) trg2[t] = 1;
+    if (trg1[(t - 1) & 1023] && trg2[(t - 1) & 1023]) { trg1[t] = 0; trg2[t] = 0; }
+  }
+  
+  drawSignal(clk1, "#EEFF88", 50);
+  drawSignal(clk2, "#00FF88", 70);
+  drawSignal(trg1, "#FFA732", 202);
+  drawSignal(trg2, "#80FFF5", 298);
+}
+
+// Initial frame
+clearFrame();
+
+// Example:
+setInterval(renderFrame, 100);
+
+</script>
+
+</body>
+</html>
